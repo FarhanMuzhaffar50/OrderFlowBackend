@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: orderflow_test
+          POSTGRES_USER: orderflow
+          POSTGRES_PASSWORD: orderflow
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U orderflow -d orderflow_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      ENVIRONMENT: test
+      DATABASE_URL: postgresql+asyncpg://orderflow:orderflow@localhost:5432/orderflow_test
+      REDIS_URL: redis://localhost:6379/0
+      CELERY_BROKER_URL: redis://localhost:6379/1
+      CELERY_RESULT_BACKEND: redis://localhost:6379/2
+      JWT_SECRET: ci-only-not-a-production-secret
+      WEBHOOK_SECRET: ci-webhook-secret
+      PAYMENT_PROVIDER_URL: http://localhost:8080
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install project and development dependencies
+        run: python -m pip install --upgrade pip && python -m pip install -e '.[dev]'
+      - name: Lint
+        run: ruff check .
+      - name: Check formatting
+        run: ruff format --check .
+      - name: Type check
+        run: mypy src
+      - name: Apply migrations
+        run: alembic upgrade head
+      - name: Run tests
+        run: pytest
+      - name: Build container image
+        run: docker build --tag orderflow:ci .
