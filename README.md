@@ -113,6 +113,5 @@ The modular monolith keeps transactions and domain changes easy to reason about;
 
 ## Further reading
 
-- [`docs/interview-guide.md`](docs/interview-guide.md) — feature-by-feature study guide and model answers.
 - [`docs/security.md`](docs/security.md) — threat model and operational controls.
 - [`docs/verification.md`](docs/verification.md) — verified versus environment-limited checks.
